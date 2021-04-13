@@ -1,0 +1,459 @@
+---
+title: "STAT 479 HW2"
+output: rmarkdown::pdf_document
+author: "Madison Polley"
+header-includes:
+    - \usepackage {hyperref}
+    - \hypersetup {colorlinks = true, linkcolor = red, urlcolor = red}
+---
+
+```{r, echo = FALSE}
+library("knitr")
+library(dplyr)
+library(tidyr)
+opts_chunk$set(cache = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Instructions
+
+1. Submit your solutions to the exercises below before **February 26 at 11:59pm
+CST**.
+2. Prepare your solutions as Rmarkdown documents. For problems in vega-lite,
+copy your code into the `.Rmd`, making sure to enclose them within `js` blocks,
+
+`````
+````js
+// your code here
+````
+`````
+
+so that the syntax is properly highlighted, e.g.,
+
+````js
+// your code here
+````
+
+3. For vega-lite problems, include a screenshot of your result.
+4. We give example figures below to guide your work. However, view these only as
+suggestions -- we will keep an eye out for improvements over our plots.
+5. Include two files in your submission, (a) a pdf of the compiled `.Rmd` file
+and (b) the original `.Rmd` file.
+
+## Rubric
+
+2 problems below will be graded according to,
+
+* Correctness: For plots, the displays meet the required specifications. For
+conceptual questions, all parts are accurately addressed.
+* Attention to detail: Writing is clear and designs are elegant. For example, no
+superfluous marks are included, all axes are labeled, text is neither too small
+nor too large.
+* Code quality (if applicable): Code is concise but readable, properly formatted
+and commented.
+
+The remaining problems will be graded for completeness.
+
+
+
+## Problems
+
+### (1) Plant Growth Experiment
+
+This problem will give you practice with tidying a dataset so that it can be
+easily visualized. The data describe the height of several plants measured every
+7 days. The plants have been treated with different amounts of a growth
+stimulant. The first few rows are printed below -- `height.x` denotes the height
+of the plant on day `x`.
+
+```{r}
+library(ggplot2)
+library("readr")
+plants <- read.csv("https://uwmadison.box.com/shared/static/qg9gwk2ldjdtcmmmiropcunf34ddonya.csv")
+head(plants)
+```
+
+
+
+a. Propose an alternative arrangement of rows and columns that conforms to the tidy data principle.
+
+**We should break each case into 4 observations, one for each time rather than having 4 height observations for each case.**
+
+
+b. Implement your proposed arrangement from part (a).
+
+```{r}
+library(stringr)
+plants.tidy = plants %>% 
+  pivot_longer(c(height.0, height.7, height.14, height.21), 
+               names_to = "day", values_to = "height")%>% 
+  mutate(day = as.integer(str_replace(day, "height.", "")))
+head(plants.tidy)
+```
+
+
+c. Using the dataset from (b), create a version of Figure 1, showing the growth of the plants over time according to different treatments.
+
+```{r}
+ggplot(plants.tidy, aes(day,height,col=plantid)) +
+  geom_line() + 
+  facet_wrap( ~ treatment, labeller = labeller(treatment = 
+    c("control" = "Control",
+      "trt1" = "Treatment 1",
+      "trt2" = "Treatment 2", "trt3" = "Treatment 3")))+
+  ggtitle("Growth of Plants Over Time According to Treatment Type")
+
+```
+
+
+### (2) California Wildfires
+
+In this problem, we will interactively visualize a
+[dataset](https://uwmadison.box.com/shared/static/k5vvekf1bhh9e16qb9s66owygc70t7dm.csv)
+giving statistics of recent California wildfires. The steps below guide you
+through the process of building this visualization. Make sure to include your
+code, a screenshot, and a brief explanation of what you did for each step.
+
+a. [Static version] Plot the day of the year that each fire started against the
+county within which it was located. Use the size of the mark to encode the
+number of acres burned in each fire. Sort the counties according to the average
+latitude of the fires within it. At this point, your figure should
+look something like Figure 2.
+
+````js
+all = vl.markPoint({filled: true, opacity: 0.25, color: "red"}).data(data).encode(
+    vl.y().fieldN("Counties").sort(vl.average("Latitude").order('ascending')),
+    vl.x().fieldQ("day_of_year").title("Day of the Year Fire the Started"),
+    vl.size().fieldQ("AcresBurned").scale({range: [50, 1500]})
+              .title("Number of Acres Burned").legend({tickCount: 5}),
+    vl.order().fieldQ("AcresBurned").sort("descending")
+  ).render();
+````
+
+**In this step, I used vl.markPoint to create a scatter plot. I decreased the opacity in order to show where points were most concentrated and changed the color to red to represent fires. I also added a title, changed the scale of the x axis, and ordered the points to be in descending order based on how many acres they burned. I sorted the Y axis and made the point sizes based on acres burned as the problem asked as well.**
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth]{StaticFires.png}
+  \caption{Result for question 2a}
+  \label{fig:1}
+\end{figure}
+
+
+b. [Interactive] Provide a tooltip so that the name of the fire can be
+identified by hovering over the points. Introduce a slider to interactively
+highlight selected years. An interactive version is linked in the caption to
+Figure 2. _Hint_: The conditional encoding examples from [Week 3 -
+1](https://observablehq.com/@krisrs1128/week-3-1) and the slider example from
+[Week 1 - 3](https://observablehq.com/@krisrs1128/introduction-to-vega-lite) may
+be useful references.
+
+````js
+{   let Slider = vl.selectSingle("select").fields("year")
+    .init({year: 2013})
+    .bind(vl.slider().min(2013).max(2019).step(1).name("Year"))
+
+  
+  return vl.markCircle({filled: true, opacity: 0.5, color: "orange"})
+    .data(data)
+    .select(Slider)
+    .encode(
+    vl.y().fieldN("Counties").sort(vl.average("Latitude").order('ascending')),
+    vl.x({"axis": {"tickCount": 20}}).fieldQ("day_of_year")
+              .title("Day of the Year Fire the Started"),
+    vl.size().fieldQ("AcresBurned").scale({range: [50, 1500]})
+    .title("Number of Acres Burned").legend({tickCount: 5}),
+    vl.order().fieldQ("AcresBurned").sort("descending"),
+    vl.color().if(Slider).value("purple"),
+    vl.tooltip().fieldN("Name")
+  ).render()}
+````
+
+**As the problem asked, I added a tooltip that shows the name of the fire by hovering over the point as well as a slider that highlights points within the selected year. Other than that, the graph is basically the same as the first graph.**
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth]{2b.png}
+  \caption{Result for question 2b}
+  \label{fig:1}
+\end{figure}
+
+c. What have you learned from this visualization? Is there additional
+information that is not described by this visualization or dataset that you
+think would enrich your interpretation?
+
+**I learned that certain years have way more fires than others and most seem to be in the summer months. I think that some interesting information that could contribute to our understanding would be the weather or rainfall around the fires.**
+
+
+### (3) Pokemon
+
+This problem gives practice in deriving new variables to improve a faceted plot.
+The data below give attack and defense statistics for Pokemon, along with their
+types. We will build a visualization to answer the question -- how do the
+different types of Pokemon vary in their attack and defense potential?
+
+```{r}
+pokemon <- read_csv("https://uwmadison.box.com/shared/static/hf5cmx3ew3ch0v6t0c2x56838er1lt2c.csv")
+head(pokemon)
+
+```
+
+a. Derive a new column containing the attack-to-defense ratio, defined as
+$\frac{\text{Attack}}{\text{Defense}}$.
+
+```{r}
+pokemon_new = pokemon %>% mutate(attackdefenseratio = Attack/Defense)
+
+```
+
+
+b. For each `type_1` group of Pokemon, compute the median attack-to-defense
+ratio.
+
+```{r}
+
+pokemon_newer <- pokemon_new %>% group_by(type_1) %>% 
+  summarise(medianratio = median(attackdefenseratio)) %>%
+  arrange(desc(medianratio))
+pokemon_newer
+```
+
+
+c. Plot the attack vs. defense scores for each Pokemon, faceted by `type_1`. Use
+the result of (b) to ensure that the panels are sorted from types with highest
+to lowest attack-to-defense ratio. Your result should look similar to Figure 3.
+
+```{r}
+library(tidyverse)
+pokemon_new %>% 
+  mutate(med = fct_reorder(type_1, attackdefenseratio, .fun="median", .desc=T)) %>%
+  ggplot( aes(x = Attack, y=Defense)) + geom_point(aes(color = Legendary)) + 
+  facet_wrap(.~med, nrow = 3) + geom_abline() +
+  theme(legend.position = "bottom") +
+  ggtitle("Attack and Defense Scores for Pokemon by First Listed Type")
+  
+```
+
+
+d. Propose, but do not implement, a visualization of this dataset that makes use
+of dynamic queries. What questions would the visualization answer? What would be
+the structure of interaction, and how would the display update when the user
+provides a cue?
+
+**We could implement a radio function in Observable that would show you the second type of the pokemon as well as a tooltip to show you the total stat and name of the pokemon. This could help us answer whether there are pattens between type1 and type2 for the pokemon as well as if the speed and defense correlate with the total stats of pokemon. These implementations would make it so the user could select the second type group and see just those points on the graphs or those points could even be highlights. In addition to this, the tooltip would make it so when you hover over the point, you see the pokemon name and/or total stat number.**
+
+### (4) NYC Airbnb Data
+
+In this problem, we'll create a visualization to dynamically query a
+[dataset](https://uwmadison.box.com/shared/static/zi72ugnpku714rbqo2og9tv2yib5xped.csv)
+of Airbnb rentals in Manhattan in 2019. The steps below guide you through the
+process of building this visualization. Make sure to include your code, a
+screenshot, and a brief explanation of what you did for each step.
+
+a. Make a scatterplot of locations (Longitude vs. Latitude) for all the rentals,
+colored in by `room_type`.
+
+````js
+vl.markCircle({filled: true, opacity: 0.8, size: 1.7})
+    .data(data1)
+    .encode(
+    vl.y().fieldQ("latitude").scale({domain: [40.69, 40.88]}),
+    vl.x().fieldQ("longitude").scale({domain: [-74.02, -73.9]}),
+  vl.color().fieldN("room_type").scale({range: ["aqua","orange", "black"]}).title("Room Type"),
+  
+
+  ).render()
+````
+**In 4a, I made a scatter plot using vl.markCircle that was colored by room type as asked. I changed the x and y domains in order to "zoom in" on the data as well.** 
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth]{4a.png}
+  \caption{Result for question 4a}
+  \label{fig:1}
+\end{figure}
+
+
+b. Make a histogram of the log-prices^[We've applied a log-transform to the
+original rental prices because otherwise the prices are highly skewed.], with
+stacked colors to distinguish between room types. Vertically concatenate this
+histogram with the scatterplot from (a). An example of the resulting display is
+shown in Figure \ref{fig:nyc}.
+
+````js
+{
+  const bar = vl.markBar({size: 2})
+    .data(data1)
+    .encode(
+      vl.x().fieldQ('log_price').title("Log of Airbnb Price"),
+      vl.y().count().title("Count of Airbnbs"),
+      vl.color().fieldN("room_type").scale({range: ["aqua", "orange", "black"]})
+    )
+    .width(500)
+    .height(100);
+  
+  // ratings scatter plot
+  const dots = vl.markCircle({filled: true, opacity: 0.8, size: 1.7})
+    .data(data1)
+    .encode(
+    vl.y().fieldQ("latitude").scale({domain: [40.69, 40.88]}),
+    vl.x().fieldQ("longitude").scale({domain: [-74.02, -73.9]}),
+  vl.color().fieldN("room_type").scale({range: ["aqua","orange", "black"]}).title("Room Type"),
+  
+
+  )
+    .width(500)
+    .height(350);
+
+  return vl.vconcat(bar, dots).render();
+}
+````
+
+**In 4b, I added a stacked histogram of the log prices of apartments above the original graph as asked. I changed the height of the histogram in order to make the data a little more clear.**
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth]{4b.png}
+  \caption{Result for question 4b}
+  \label{fig:1}
+\end{figure}
+
+c. Introduce a selection so that brushing over price ranges highlights the
+associated rentals on the map. _Hint_: This is similar to the
+movie-ratings-over-time visualization from [Week 3
+[2]](https://observablehq.com/@krisrs1128/week-3-2).
+
+````js
+{
+  const brush = vl.selectInterval()
+    .encodings('x'); // limit selection to x-axis values
+  
+  const bar = vl.markBar({size: 2})
+    .data(data1)
+    .select(brush)
+    .encode(
+      vl.x().fieldQ('log_price').title("Log of Airbnb Price"),
+      vl.y().count().title("Count of Airbnbs"),
+      vl.color().fieldN("room_type").scale({range: ["aqua", "orange", "black"]})
+    )
+    .width(500)
+    .height(100);
+  
+
+  const dots = vl.markCircle({filled: true, size: 1.7})
+    .data(data1)
+    .encode(
+    vl.y().fieldQ("latitude").scale({domain: [40.69, 40.88]}),
+    vl.x().fieldQ("longitude").scale({domain: [-74.02, -73.9]}),
+  vl.color().fieldN("room_type").scale({range: ["aqua","orange", "black"]}).title("Room Type"),
+    vl.opacity().if(brush, vl.value(0.75)).value(0.05)
+  
+
+  )
+    .width(500)
+    .height(350);
+
+  return vl.vconcat(bar, dots).render();
+}
+````
+**For 4c, I added a brush selection tool so that brushing over the histogram of prices would highlight certain points within that price range on the scatter plot. Other than that, the graph is basically the same as 4b.**
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1\textwidth]{4c.jpg}
+  \caption{Result for question 4c}
+  \label{fig:1}
+\end{figure}
+
+d. Comment on the resulting visualization. If you had a friend who was
+interested in renting an Airbnb in NYC, what would you tell them?
+
+**It seems like you get more for your money in the lower left side of the area. In the upper right side, renting the entire home or apartment is much much more expensive than doing the same in the lower left area. I would recommend staying in the lower left area if you're worried about money.**
+
+### (5) Imputing Housing Data
+
+This problem gives practice visualizing missing-data imputation. We will use
+another housing-themed dataset, this one describing homes for sale in Melbourne.
+Notice that the `BuildingArea` and `YearBuilt` variables have many missing
+values.
+
+```{r}
+housing <- read_csv("https://uwmadison.box.com/shared/static/h5u176syp4xkret4w89n70efsp1tubex.csv")
+```
+
+a. Using `geom_miss_point`, make a plot of `Price` against `BuildingArea`,
+faceted by the region from which the home is located. Make sure the observations
+with missing `BuildingArea` values are still displayed somewhere on the plot, as
+in Figure 5. What does the plot suggest about how you might impute the
+`BuildingArea` column?
+
+```{r fig.height=4, hig.width = 15}
+library(naniar)
+library(scales)
+
+ggplot(housing,
+       aes(x = Price,
+           y = BuildingArea)) +
+ geom_miss_point(jitter = 1, size = 1, alpha= 0.5) + facet_wrap(.~Regionname, nrow=2) +
+  scale_y_continuous(limits=c(1, 10000), trans='log10') +
+  scale_x_continuous( labels = scientific, trans = "log10" ) +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle=45, hjust = 1),
+                                                               strip.text = element_text(size=8)) +
+  ggtitle("Price vs. Building Area By Region")
+  
+
+```
+
+**I think this shows that we could impute using the region the homes are in.**
+
+b. Using the `impute_lm` package, impute the `BuildingArea` variable. You may
+use whichever fully measured columns that you like -- using `BuildingArea ~
+Price` is a reasonable starting point.
+
+
+
+```{r}
+library(simputation)
+library(dplyr)
+
+##I added a variable named "imputed" for easier identification in the
+##next step of the problem.
+
+imputed <- housing %>%
+  bind_shadow() %>%
+  as.data.frame() %>%
+  mutate(imputed = is.na(BuildingArea)) %>%
+  impute_lm(BuildingArea ~ Price + Type + Postcode+ Regionname)
+
+```
+
+
+c. Recreate the visualization from part (a), but with the imputed data included.
+Make sure to distinguish between values that were truly measured and those that
+were imputed in part (b). Comment on the quality of the results. Do you notice
+anything unusual about the imputations in Northern Victoria?
+
+```{r fig.height=4, hig.width = 15}
+
+ggplot(imputed,
+       aes(x = Price,
+           y = BuildingArea, color = imputed)) +
+ geom_miss_point(jitter = 1, size = 1, alpha= 0.5) + facet_wrap(.~Regionname, nrow=2) +
+  scale_y_continuous(limits=c(1, 10000), trans='log10') +
+  scale_x_continuous( labels = scientific, trans = "log10" ) +
+  theme(legend.position = "bottom", axis.text.x = element_text(angle=45, hjust = 1),
+                                                               strip.text = element_text(size=8))+
+  ggtitle("Price Vs. Building Area By Region With Imputed Values")
+
+```
+
+**The values definitely look like they're imputed as they are not very spread throughout the graphs, but they do follow the general trends of most of the regions. Nothern Victoria, however, has some very odd imputed values, which are high above the actual values.**
+
+## Feedback
+
+a. How much time did you spend on this homework?
+**About 5 hours**
+
+b. Which problem did you find most valuable?
+**I always enjoy the observable graphs! However, I think problem 4 was helpful as it shows us how to deal with missing values in an interesting way.**

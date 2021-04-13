@@ -1,0 +1,131 @@
+---
+title: "Madison Polley Data Cleaning and Restructuring Midterm"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+```{r , echo = FALSE, warning=FALSE}
+library(knitr)
+library("dplyr")
+library("dslabs")
+library(ggplot2)
+library(ggrepel)
+library(scales)
+library(readr)
+library(ggridges)
+library(tidyr)
+library(stringr)
+library(skimr)
+library(naniar)
+library(UpSetR)
+library(MASS)
+library(rpart)
+library(simputation)
+library(purrr)
+library(gbm)
+library(lubridate)
+library(tsibbledata)
+library(tsibble)
+
+```
+
+```{r}
+homes = read.csv(url("https://uwmadison.box.com/shared/static/h5u176syp4xkret4w89n70efsp1tubex.csv"))
+sport = read.csv(url("https://uwmadison.box.com/shared/static/rzw8h2x6dp5693gdbpgxaf2koqijo12l.csv"))
+language = read.csv(url("https://uwmadison.box.com/shared/static/m53dea9w5ipczs3d7nqdnxqxx5ao501b.csv"))
+ratebefore = read.csv(url("https://uwmadison.box.com/shared/static/h4gau9heqy3uue9rmpq9b55s3kw37zd8.csv"))
+ratefinish = read.csv(url("https://uwmadison.box.com/shared/static/shy7od3ydtiqu3lmqvy4nbi17qkg2ys4.csv"))
+antibefore = read.csv(url("https://uwmadison.box.com/shared/static/bq4afq9kl2zn9qlb89q2rxhrrv73iuil.csv"))
+antifinish = read.csv(url("https://uwmadison.box.com/shared/static/gmzul7bp78o6kwtutl73hkiyxea4dr21.csv"))
+bike = read.csv(url("https://uwmadison.box.com/shared/static/f16jmkkskylfl1hnd5rpslzduja929g2.csv"))
+```
+
+**This is what we want the data to look like:**
+
+```{r}
+ratefinish
+```
+
+**This is the data I was given to restructure:**
+
+```{r}
+ratebefore
+```
+
+**Below is my code to restructure the data into the desired format:**
+
+```{r}
+ratebefore %>%
+  mutate(murder_rate = total / population) %>%
+  group_by(region) %>%
+  summarise(murders = sum(total), 
+            population = sum(population), 
+            murder_rate = murders/population) %>%
+  arrange(murder_rate)
+  
+```
+
+**This is what we want the data to look like:**
+```{r}
+antifinish
+```
+
+**This is the data I was given:**
+```{r}
+antibefore
+```
+
+**This is my code to restructure the data into the desired format:**
+
+```{r}
+antibefore %>%
+  pivot_longer(cols= c("Unc05qi6", "Unc06af7", "Unc06bhm", "Unc06g1h", "Unc05qi6", "Unc06af7", "Unc06bhm", "Unc06g1h", "Unc06grq", "Unc09fy6"),
+               names_to = "species",
+               values_to = "value") %>%
+  separate(sample, into = c("ind", "time"), sep = 1, remove = F, convert = T) %>%
+  arrange(species)
+```
+
+**This is the data I was given:**
+```{r}
+bike
+```
+
+**I was asked to create a set of line graphs to show the trends in bike usage by time for each day of the week over the years the data was kept. Below is the code I wrote to find said trends.**
+
+```{r fig.height= 8, fig.width= 8}
+bike %>%
+  mutate(weekday = factor(weekday, labels = c("Su", "M", "Tu", "W", "Tr", "F", "Sa"))) %>%
+  ggplot(aes(x=hr, y=count, group = dteday)) +
+  geom_line(size=0.1) + facet_wrap(.~ weekday) + 
+  theme( axis.text.y = element_text(size=10), axis.text.x = element_text(size=10)) +
+  labs(x = "Hour of the Day", title = "Bike Usage Counts by Hour of the Day and Day of the Week")
+```
+
+**Then I was asked to create variables that gave the 25th and 75th percentile of bike usage for each hour within each weekday and year combination. Once I completed that, I was to create line plots for each day of the week that highlighted the middle 50% of the data for each year in the dataset. Below is the code I used to accomplish this.**
+
+
+
+```{r fig.height= 18, fig.width=12}
+
+percentiles = bike %>%
+  group_by(yr, weekday, hr) %>%
+  summarise(
+            quant25 = quantile(count, c(0.25)),
+            quant75 = quantile(count, c(0.75)))
+
+fulll = bike %>%
+  left_join(percentiles, by=c("yr", "weekday", "hr")) %>%
+  mutate(weekday = factor(weekday, labels = c("Su", "M", "Tu", "W", "Tr", "F", "Sa")))
+
+fulll = as_tsibble(fulll, key = c("dteday", "holiday", "weekday", "temp", "hum", "windspeed", "count"), index = hr)
+fulll
+
+ggplot(fulll, aes(x=hr, y = count, group = dteday, ymin =quant25, ymax =quant75)) + geom_line()  + geom_ribbon( aes( fill = factor(yr)), alpha = 0.03 ) + facet_wrap(.~weekday) + scale_fill_manual(values = c("#00AFBB", "#E7B800")) + theme(legend.position = "bottom")
+
+```
+
+
