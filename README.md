@@ -1,2 +1,2 @@
 # DataVisualizationsForStatistics
-This is the collection of my completed homeworks for my Data Visualizations for Statistics class at the University of Wisconsin - Madison.
+This is the collection of my completed homeworks for my Data Visualizations for Statistics class at the University of Wisconsin - Madison. Though I am still learning, I would like to show my progression through topics such as: basic graphics, interaction, data wrangling, time series, geographic data, network data, clustering, dimensionality reduction, model building, and deep learning model visualization.
